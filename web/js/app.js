@@ -5,11 +5,19 @@ const LON = 33.3918;
 let unit = "C";
 let tab = "temp";
 
-// UI helpers
+let model = null;
+let scaler = null;
+
+let data = {
+  now: { c: 0, precip: 0, humidity: 0, windKmh: 0, summary: CITY, dayName: "—" },
+  hours: [],  // 24 forecast points (temp model output + real precip/wind optionally)
+  days: []
+};
+
 const $ = (s) => document.querySelector(s);
 const cToF = (c) => Math.round((c * 9/5) + 32);
 
-function setActiveButtons() {
+function setActiveButtons(){
   document.querySelectorAll(".unit").forEach(b =>
     b.classList.toggle("is-active", b.dataset.unit === unit)
   );
@@ -18,19 +26,22 @@ function setActiveButtons() {
   );
 }
 
-// --- Data model used by the UI
-let data = {
-  now: { c: 0, precip: 0, humidity: 0, windKmh: 0, summary: "—", dayName: "—" },
-  hours: [],   // [{t:"12:00", c:1, precip:15, wind:6}, ...] length 24
-  days: []     // optional row; we can keep 8 days from API
-};
+function setNow(){
+  const t = unit === "C" ? data.now.c : cToF(data.now.c);
+  $("#tempNow").textContent = t;
+  $("#precipNow").textContent = `${data.now.precip}%`;
+  $("#humidityNow").textContent = `${data.now.humidity}%`;
+  $("#windNow").textContent = `${data.now.windKmh} км/ч`;
+  $("#summary").textContent = data.now.summary;
+  $("#dayName").textContent = data.now.dayName;
+}
 
-function renderDays() {
+function renderDays(){
   const host = $("#days");
   host.innerHTML = "";
-  data.days.forEach(d => {
+  data.days.forEach(d=>{
     const el = document.createElement("div");
-    el.className = `day ${d.today ? "is-today" : ""}`;
+    el.className = `day ${d.today ? "is-today":""}`;
     el.innerHTML = `
       <div class="dname">${d.name}</div>
       <div class="dicon">${d.icon}</div>
@@ -40,23 +51,23 @@ function renderDays() {
   });
 }
 
-function renderXLabels() {
+function renderXLabels(){
   const host = $("#xlabels");
   host.innerHTML = "";
-  data.hours.forEach(h => {
+  data.hours.forEach(h=>{
     const s = document.createElement("div");
     s.textContent = h.t;
     host.appendChild(s);
   });
 }
 
-function seriesByTab() {
+function seriesByTab(){
   if (tab === "temp") return data.hours.map(h => unit === "C" ? h.c : cToF(h.c));
   if (tab === "precip") return data.hours.map(h => h.precip);
   return data.hours.map(h => h.wind);
 }
 
-function renderSpark() {
+function renderSpark(){
   const svgW = 700, svgH = 140, padX = 18, padY = 18;
   const values = seriesByTab();
   if (!values.length) return;
@@ -66,27 +77,25 @@ function renderSpark() {
   const span = (max - min) || 1;
 
   const n = values.length;
-  const xStep = (svgW - padX * 2) / (n - 1);
+  const xStep = (svgW - padX*2) / (n - 1);
 
   const pts = values.map((v, i) => {
     const x = padX + i * xStep;
-    const y = padY + (svgH - padY * 2) * (1 - (v - min) / span);
-    return { x, y };
+    const y = padY + (svgH - padY*2) * (1 - (v - min)/span);
+    return {x, y};
   });
 
-  const dLine = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const dLine = pts.map((p,i)=> `${i===0?"M":"L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
   $("#line").setAttribute("d", dLine);
 
-  const dArea =
-    `${dLine} L ${(padX + (n - 1) * xStep).toFixed(2)} ${(svgH - padY).toFixed(2)} ` +
-    `L ${padX.toFixed(2)} ${(svgH - padY).toFixed(2)} Z`;
+  const dArea = `${dLine} L ${(padX + (n-1)*xStep).toFixed(2)} ${(svgH-padY).toFixed(2)} L ${padX.toFixed(2)} ${(svgH-padY).toFixed(2)} Z`;
   $("#area").setAttribute("d", dArea);
 
   const dots = $("#dots");
   dots.innerHTML = "";
-  pts.forEach(p => {
-    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.setAttribute("class", "dot");
+  pts.forEach(p=>{
+    const c = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    c.setAttribute("class","dot");
     c.setAttribute("cx", p.x);
     c.setAttribute("cy", p.y);
     c.setAttribute("r", 3.5);
@@ -94,19 +103,9 @@ function renderSpark() {
   });
 }
 
-function setNow() {
-  const tempNow = unit === "C" ? data.now.c : cToF(data.now.c);
-  $("#tempNow").textContent = tempNow;
-  $("#precipNow").textContent = `${data.now.precip}%`;
-  $("#humidityNow").textContent = `${data.now.humidity}%`;
-  $("#windNow").textContent = `${data.now.windKmh} км/ч`;
-  $("#summary").textContent = data.now.summary;
-  $("#dayName").textContent = data.now.dayName;
-}
-
-function wire() {
-  document.querySelectorAll(".unit").forEach(b => {
-    b.addEventListener("click", () => {
+function wire(){
+  document.querySelectorAll(".unit").forEach(b=>{
+    b.addEventListener("click", ()=>{
       unit = b.dataset.unit;
       setActiveButtons();
       setNow();
@@ -114,8 +113,8 @@ function wire() {
     });
   });
 
-  document.querySelectorAll(".tab").forEach(b => {
-    b.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(b=>{
+    b.addEventListener("click", ()=>{
       tab = b.dataset.tab;
       setActiveButtons();
       renderSpark();
@@ -123,10 +122,47 @@ function wire() {
   });
 }
 
-// --- Fetch 24h forecast from Open-Meteo
-async function loadForecast24h() {
-  // hourly: temp, precip prob, wind, relative humidity
-  // daily: min/max
+function dayNameUA(d){
+  const names = ["неділя","понеділок","вівторок","середа","четвер","пʼятниця","субота"];
+  return names[d.getDay()];
+}
+function shortDowUA(isoDate){
+  const d = new Date(isoDate);
+  const names = ["НД","ПН","ВТ","СР","ЧТ","ПТ","СБ"];
+  return names[d.getDay()];
+}
+function formatHHMM(iso){
+  const t = iso.split("T")[1] || "";
+  return t.slice(0,5);
+}
+function findClosestHourIndex(hourlyTimes, currentTimeISO){
+  const key = currentTimeISO.slice(0, 13); // YYYY-MM-DDTHH
+  const i = hourlyTimes.findIndex(t => t.startsWith(key));
+  return i !== -1 ? i : 0;
+}
+
+async function loadScaler(){
+  const r = await fetch("../artifacts/scaler.json").catch(()=>null);
+  // якщо artifacts недоступний на GitHub Pages — поклади scaler.json у web/ також
+  if (!r || !r.ok) {
+    const r2 = await fetch("scaler.json");
+    if (!r2.ok) throw new Error("Нема scaler.json (поклади його у web/ або web/model/)");
+    return await r2.json();
+  }
+  return await r.json();
+}
+
+function scaleRow(row){
+  // row: [temp_c, humidity, wind_kmh, precip_prob]
+  const out = [];
+  for (let i=0;i<row.length;i++){
+    out.push((row[i] - scaler.mean[i]) / scaler.scale[i]);
+  }
+  return out;
+}
+
+async function fetchHistoryAndReal24h(){
+  // беремо 72 години, щоб точно мати останні 48 для входу + 24 для підписів
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
     `&hourly=temperature_2m,precipitation_probability,windspeed_10m,relativehumidity_2m` +
@@ -134,37 +170,42 @@ async function loadForecast24h() {
     `&current_weather=true&timezone=Europe%2FKyiv`;
 
   const r = await fetch(url);
-  if (!r.ok) throw new Error("Не вдалося завантажити прогноз");
+  if (!r.ok) throw new Error("Не вдалося завантажити дані погоди");
   const j = await r.json();
 
-  // build 24 next hours starting "now"
   const times = j.hourly.time;
   const idxNow = findClosestHourIndex(times, j.current_weather.time);
 
-  const sliceStart = Math.max(0, idxNow);
-  const sliceEnd = Math.min(times.length, sliceStart + 24);
+  const inputHours = scaler.input_hours;   // 48
+  const horizon = scaler.horizon;          // 24
 
-  data.hours = [];
-  for (let i = sliceStart; i < sliceEnd; i++) {
-    data.hours.push({
-      t: formatHHMM(times[i]),
-      c: Math.round(j.hourly.temperature_2m[i]),
-      precip: Math.round(j.hourly.precipitation_probability[i] ?? 0),
-      wind: Math.round(j.hourly.windspeed_10m[i] ?? 0)
-    });
-  }
+  const startIn = Math.max(0, idxNow - (inputHours - 1));
+  const endIn = startIn + inputHours;
 
-  // now block
+  const inTimes = times.slice(startIn, endIn);
+
+  const Xwin = inTimes.map((_,k) => {
+    const i = startIn + k;
+    const row = [
+      j.hourly.temperature_2m[i],
+      j.hourly.relativehumidity_2m[i] ?? 0,
+      j.hourly.windspeed_10m[i] ?? 0,
+      j.hourly.precipitation_probability[i] ?? 0
+    ];
+    return scaleRow(row);
+  });
+
+  // “реальні” метрики для now (з API)
   data.now = {
     c: Math.round(j.current_weather.temperature),
-    precip: Math.round((j.hourly.precipitation_probability[idxNow] ?? 0)),
-    humidity: Math.round((j.hourly.relativehumidity_2m[idxNow] ?? 0)),
+    precip: Math.round(j.hourly.precipitation_probability[idxNow] ?? 0),
+    humidity: Math.round(j.hourly.relativehumidity_2m[idxNow] ?? 0),
     windKmh: Math.round(j.current_weather.windspeed),
-    summary: "Кривий Ріг",
+    summary: CITY,
     dayName: dayNameUA(new Date())
   };
 
-  // simple 8-day row (optional)
+  // 8-day row (просто красиво)
   data.days = (j.daily.time || []).slice(0, 8).map((d, k) => ({
     name: shortDowUA(d),
     icon: "☁️",
@@ -172,48 +213,64 @@ async function loadForecast24h() {
     lo: Math.round(j.daily.temperature_2m_min[k]),
     today: k === 0
   }));
+
+  // також підготуємо “реальні” precip/wind на 24 години для вкладок
+  const start24 = idxNow;
+  const end24 = Math.min(times.length, start24 + horizon);
+  const labels24 = times.slice(start24, end24).map(formatHHMM);
+
+  const real24 = [];
+  for (let i=start24;i<end24;i++){
+    real24.push({
+      t: formatHHMM(times[i]),
+      precip: Math.round(j.hourly.precipitation_probability[i] ?? 0),
+      wind: Math.round(j.hourly.windspeed_10m[i] ?? 0),
+    });
+  }
+
+  return { Xwin, labels24, real24 };
 }
 
-function findClosestHourIndex(hourlyTimes, currentTimeISO) {
-  // hourlyTimes: ["2025-..T10:00", ...], currentTimeISO: "2025-..T10:30" or "T10:00"
-  // We'll match by same hour prefix.
-  const key = currentTimeISO.slice(0, 13); // "YYYY-MM-DDTHH"
-  let i = hourlyTimes.findIndex(t => t.startsWith(key));
-  if (i !== -1) return i;
-  // fallback: first item
-  return 0;
+async function predict24h(){
+  $("#status").textContent = "Завантаження scaler…";
+  scaler = await loadScaler();
+
+  $("#status").textContent = "Завантаження TF.js моделі…";
+  model = await tf.loadLayersModel("model/model.json");
+
+  $("#status").textContent = "Отримання даних (Кривий Ріг)…";
+  const { Xwin, labels24, real24 } = await fetchHistoryAndReal24h();
+
+  $("#status").textContent = "Прогноз на 24 години…";
+  const x = tf.tensor(Xwin, [1, scaler.input_hours, scaler.features.length], "float32");
+  const y = model.predict(x);
+  const yArr = Array.from(await y.data()); // 24 значення температури (°C як в train)
+
+  x.dispose(); y.dispose();
+
+  data.hours = yArr.map((temp, i) => ({
+    t: labels24[i] ?? `${i}:00`,
+    c: Math.round(temp),
+    precip: real24[i]?.precip ?? 0,
+    wind: real24[i]?.wind ?? 0,
+  }));
+
+  $("#status").textContent = "Готово ✅";
+  setNow();
+  renderXLabels();
+  renderSpark();
+  renderDays();
 }
 
-function formatHHMM(iso) {
-  // "YYYY-MM-DDTHH:MM" -> "HH:MM"
-  const t = iso.split("T")[1] || "";
-  return t.slice(0, 5);
-}
-
-function dayNameUA(d) {
-  const names = ["неділя","понеділок","вівторок","середа","четвер","пʼятниця","субота"];
-  return names[d.getDay()];
-}
-function shortDowUA(isoDate) {
-  const d = new Date(isoDate);
-  const names = ["НД","ПН","ВТ","СР","ЧТ","ПТ","СБ"];
-  return names[d.getDay()];
-}
-
-// init
 (async function init(){
   wire();
   setActiveButtons();
 
-  try {
-    await loadForecast24h();
-    setNow();
-    renderXLabels();
-    renderSpark();
-    renderDays();
-  } catch (e) {
-    // fallback minimal
-    $("#summary").textContent = "Немає з’єднання з прогнозом";
+  try{
+    await predict24h();
+  }catch(e){
     console.error(e);
+    $("#status").textContent = "Помилка: " + (e?.message || e);
   }
 })();
+
