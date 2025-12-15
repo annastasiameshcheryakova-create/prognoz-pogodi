@@ -19,7 +19,7 @@ const cToF = (c) => Math.round((c * 9/5) + 32);
 
 function setStatus(msg){
   const el = $("#status");
-  if (el) el.textContent = msg; // не ломаем сайт, если элемента нет
+  if (el) el.textContent = msg;
 }
 
 function setActiveButtons(){
@@ -146,10 +146,10 @@ function findClosestHourIndex(hourlyTimes, currentTimeISO){
   return i !== -1 ? i : 0;
 }
 
-/** ВАЖНО: на Pages scaler лежит тут */
+/* Пути под твою структуру (index.html в корне, сайт в web/) */
 async function loadScaler(){
   const r = await fetch("web/scaler.json");
-  if (!r.ok) throw new Error("Не знайдено web/scaler.json");
+  if (!r.ok) throw new Error("Не знайдено web/scaler.json (додай його у web/)");
   return await r.json();
 }
 
@@ -175,8 +175,8 @@ async function fetchHistoryAndReal24h(){
   const times = j.hourly.time;
   const idxNow = findClosestHourIndex(times, j.current_weather.time);
 
-  const inputHours = scaler.input_hours; // 48
-  const horizon = scaler.horizon;        // 24
+  const inputHours = scaler.input_hours;
+  const horizon = scaler.horizon;
 
   const startIn = Math.max(0, idxNow - (inputHours - 1));
   const endIn = startIn + inputHours;
@@ -232,9 +232,8 @@ async function predict24h(){
   scaler = await loadScaler();
 
   setStatus("Завантаження TF.js моделі…");
-  // ВАЖНО: модель лежит в web/model/
-  model = await tf.loadLayersModel("web/model/model.json");
-
+  model = await tf.loadLayersModel("web/model/model.json"); // путь под web/model/
+  
   setStatus("Отримання даних (Кривий Ріг)…");
   const { Xwin, labels24, real24 } = await fetchHistoryAndReal24h();
 
@@ -242,7 +241,6 @@ async function predict24h(){
   const x = tf.tensor(Xwin, [1, scaler.input_hours, scaler.features.length], "float32");
   const y = model.predict(x);
   const yArr = Array.from(await y.data());
-
   x.dispose(); y.dispose();
 
   data.hours = yArr.map((temp, i) => ({
@@ -270,4 +268,3 @@ async function predict24h(){
     setStatus("Помилка: " + (e?.message || e));
   }
 })();
-
