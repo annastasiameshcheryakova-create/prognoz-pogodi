@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Погода</title>
 
-  <!-- CSS -->
+  <!-- CSS (лежит в web/css/) -->
   <link rel="stylesheet" href="web/css/style.css" />
+
+  <!-- TFJS нужен для tf.loadLayersModel -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 </head>
 
 <body>
@@ -18,7 +21,7 @@
 
           <div class="temp">
             <div class="big">
-              <span id="tempNow">3</span><span class="deg">°</span>
+              <span id="tempNow">—</span><span class="deg">°</span>
             </div>
 
             <div class="unit-toggle" role="group" aria-label="Одиниці">
@@ -27,9 +30,9 @@
             </div>
 
             <div class="stats">
-              <div><span class="label">Ймовірність опадів:</span> <span id="precipNow">25%</span></div>
-              <div><span class="label">Вологість:</span> <span id="humidityNow">86%</span></div>
-              <div><span class="label">Вітер:</span> <span id="windNow">8 км/ч</span></div>
+              <div><span class="label">Ймовірність опадів:</span> <span id="precipNow">—</span></div>
+              <div><span class="label">Вологість:</span> <span id="humidityNow">—</span></div>
+              <div><span class="label">Вітер:</span> <span id="windNow">—</span></div>
             </div>
           </div>
         </div>
@@ -37,8 +40,8 @@
         <div class="place">
           <div class="title">Погода</div>
           <div class="sub">
-            <span id="dayName">понеділок</span><br/>
-            <span id="summary">Облачно</span>
+            <span id="dayName">—</span><br/>
+            <span id="summary">Кривий Ріг</span>
           </div>
         </div>
       </header>
@@ -51,7 +54,7 @@
 
       <section class="chart">
         <div class="yline"></div>
-        <svg id="spark" viewBox="0 0 700 140" preserveAspectRatio="none">
+        <svg id="spark" viewBox="0 0 700 140" preserveAspectRatio="none" aria-label="Графік">
           <path id="area" d="" />
           <path id="line" d="" />
           <g id="dots"></g>
@@ -60,10 +63,13 @@
       </section>
 
       <section class="days" id="days"></section>
+
+      <!-- ВАЖНО: статус нужен для app.js -->
+      <footer class="foot"><span id="status">Завантаження…</span></footer>
     </section>
   </main>
 
-  <!-- JS -->
+  <!-- JS (лежит в web/js/) -->
   <script src="web/js/app.js"></script>
 </body>
 </html>
