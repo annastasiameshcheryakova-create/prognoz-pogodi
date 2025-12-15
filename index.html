@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Погода</title>
 
-  <!-- CSS (лежит в web/css/) -->
+  <!-- CSS -->
   <link rel="stylesheet" href="web/css/style.css" />
 
-  <!-- TFJS нужен для tf.loadLayersModel -->
+  <!-- TFJS (обязательно, иначе tf is not defined) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 </head>
 
@@ -54,7 +54,7 @@
 
       <section class="chart">
         <div class="yline"></div>
-        <svg id="spark" viewBox="0 0 700 140" preserveAspectRatio="none" aria-label="Графік">
+        <svg id="spark" viewBox="0 0 700 140" preserveAspectRatio="none">
           <path id="area" d="" />
           <path id="line" d="" />
           <g id="dots"></g>
@@ -64,12 +64,12 @@
 
       <section class="days" id="days"></section>
 
-      <!-- ВАЖНО: статус нужен для app.js -->
+      <!-- статус нужен для сообщений из JS -->
       <footer class="foot"><span id="status">Завантаження…</span></footer>
     </section>
   </main>
 
-  <!-- JS (лежит в web/js/) -->
+  <!-- JS -->
   <script src="web/js/app.js"></script>
 </body>
 </html>
