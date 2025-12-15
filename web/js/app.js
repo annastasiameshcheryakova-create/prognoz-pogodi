@@ -10,8 +10,8 @@ let scaler = null;
 
 let data = {
   now: { c: 0, precip: 0, humidity: 0, windKmh: 0, summary: CITY, dayName: "—" },
-  hours: [],
-  days: []
+  hours: [],   // [{t, c, precip, wind}]
+  days: []     // [{name, icon, hi, lo, today}]
 };
 
 const $ = (s) => document.querySelector(s);
@@ -59,9 +59,11 @@ function renderDays(){
 function renderXLabels(){
   const host = $("#xlabels");
   host.innerHTML = "";
-  data.hours.forEach(h=>{
+  // Щоб не злипалось — показуємо 7 підписів (0..23)
+  const idxs = data.hours.length >= 24 ? [0,4,8,12,16,20,23] : data.hours.map((_,i)=>i);
+  idxs.forEach(i=>{
     const s = document.createElement("div");
-    s.textContent = h.t;
+    s.textContent = data.hours[i]?.t ?? "";
     host.appendChild(s);
   });
 }
@@ -141,16 +143,25 @@ function formatHHMM(iso){
   return t.slice(0,5);
 }
 function findClosestHourIndex(hourlyTimes, currentTimeISO){
-  const key = currentTimeISO.slice(0, 13);
+  const key = currentTimeISO.slice(0, 13); // YYYY-MM-DDTHH
   const i = hourlyTimes.findIndex(t => t.startsWith(key));
   return i !== -1 ? i : 0;
 }
 
-/* Пути под твою структуру (index.html в корне, сайт в web/) */
-async function loadScaler(){
-  const r = await fetch("web/scaler.json");
-  if (!r.ok) throw new Error("Не знайдено web/scaler.json (додай його у web/)");
+/* ✅ Під твою структуру: index.html у корені, сайт у web/ */
+async function tryLoadScaler(){
+  const r = await fetch("web/scaler.json").catch(()=>null);
+  if (!r || !r.ok) return null;
   return await r.json();
+}
+async function tryLoadModel(){
+  // Якщо tfjs не підключено — не падаємо
+  if (typeof tf === "undefined") return null;
+  try{
+    return await tf.loadLayersModel("web/model/model.json");
+  }catch{
+    return null;
+  }
 }
 
 function scaleRow(row){
@@ -161,7 +172,7 @@ function scaleRow(row){
   return out;
 }
 
-async function fetchHistoryAndReal24h(){
+async function fetchOpenMeteo(){
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
     `&hourly=temperature_2m,precipitation_probability,windspeed_10m,relativehumidity_2m` +
@@ -170,20 +181,60 @@ async function fetchHistoryAndReal24h(){
 
   const r = await fetch(url);
   if (!r.ok) throw new Error("Не вдалося завантажити дані погоди");
-  const j = await r.json();
+  return await r.json();
+}
 
+async function buildFromApiOnly(j){
   const times = j.hourly.time;
   const idxNow = findClosestHourIndex(times, j.current_weather.time);
 
-  const inputHours = scaler.input_hours;
-  const horizon = scaler.horizon;
+  // now
+  data.now = {
+    c: Math.round(j.current_weather.temperature),
+    precip: Math.round(j.hourly.precipitation_probability[idxNow] ?? 0),
+    humidity: Math.round(j.hourly.relativehumidity_2m[idxNow] ?? 0),
+    windKmh: Math.round(j.current_weather.windspeed),
+    summary: CITY,
+    dayName: dayNameUA(new Date())
+  };
+
+  // days
+  data.days = (j.daily.time || []).slice(0, 8).map((d, k) => ({
+    name: shortDowUA(d),
+    icon: "☁️",
+    hi: Math.round(j.daily.temperature_2m_max[k]),
+    lo: Math.round(j.daily.temperature_2m_min[k]),
+    today: k === 0
+  }));
+
+  // 24h прям з API (без ML)
+  const horizon = 24;
+  const start24 = idxNow;
+  const end24 = Math.min(times.length, start24 + horizon);
+
+  data.hours = [];
+  for (let i=start24;i<end24;i++){
+    data.hours.push({
+      t: formatHHMM(times[i]),
+      c: Math.round(j.hourly.temperature_2m[i] ?? 0),
+      precip: Math.round(j.hourly.precipitation_probability[i] ?? 0),
+      wind: Math.round(j.hourly.windspeed_10m[i] ?? 0),
+    });
+  }
+}
+
+async function buildWithML(j){
+  const times = j.hourly.time;
+  const idxNow = findClosestHourIndex(times, j.current_weather.time);
+
+  const inputHours = scaler.input_hours; // 48
+  const horizon = scaler.horizon;        // 24
 
   const startIn = Math.max(0, idxNow - (inputHours - 1));
   const endIn = startIn + inputHours;
 
-  const inTimes = times.slice(startIn, endIn);
-
-  const Xwin = inTimes.map((_,k) => {
+  const Xwin = [];
+  for (let k=0;k<inputHours;k++){
     const i = startIn + k;
     const row = [
       j.hourly.temperature_2m[i],
@@ -191,9 +242,10 @@ async function fetchHistoryAndReal24h(){
       j.hourly.windspeed_10m[i] ?? 0,
       j.hourly.precipitation_probability[i] ?? 0
     ];
-    return scaleRow(row);
-  });
+    Xwin.push(scaleRow(row));
+  }
 
+  // now + days так само з API
   data.now = {
     c: Math.round(j.current_weather.temperature),
     precip: Math.round(j.hourly.precipitation_probability[idxNow] ?? 0),
@@ -211,34 +263,21 @@ async function fetchHistoryAndReal24h(){
     today: k === 0
   }));
 
+  // реальні precip/wind + labels на 24h
   const start24 = idxNow;
   const end24 = Math.min(times.length, start24 + horizon);
-  const labels24 = times.slice(start24, end24).map(formatHHMM);
 
+  const labels24 = times.slice(start24, end24).map(formatHHMM);
   const real24 = [];
   for (let i=start24;i<end24;i++){
     real24.push({
-      t: formatHHMM(times[i]),
       precip: Math.round(j.hourly.precipitation_probability[i] ?? 0),
       wind: Math.round(j.hourly.windspeed_10m[i] ?? 0),
     });
   }
 
-  return { Xwin, labels24, real24 };
-}
-
-async function predict24h(){
-  setStatus("Завантаження scaler…");
-  scaler = await loadScaler();
-
-  setStatus("Завантаження TF.js моделі…");
-  model = await tf.loadLayersModel("web/model/model.json"); // путь под web/model/
-  
-  setStatus("Отримання даних (Кривий Ріг)…");
-  const { Xwin, labels24, real24 } = await fetchHistoryAndReal24h();
-
-  setStatus("Прогноз на 24 години…");
-  const x = tf.tensor(Xwin, [1, scaler.input_hours, scaler.features.length], "float32");
+  // predict
+  const x = tf.tensor(Xwin, [1, inputHours, scaler.features.length], "float32");
   const y = model.predict(x);
   const yArr = Array.from(await y.data());
   x.dispose(); y.dispose();
@@ -249,22 +288,38 @@ async function predict24h(){
     precip: real24[i]?.precip ?? 0,
     wind: real24[i]?.wind ?? 0,
   }));
-
-  setStatus("Готово ✅");
-  setNow();
-  renderXLabels();
-  renderSpark();
-  renderDays();
 }
 
-(async function init(){
+async function main(){
   wire();
   setActiveButtons();
+  setStatus("Завантаження даних…");
 
   try{
-    await predict24h();
+    const j = await fetchOpenMeteo();
+
+    // пробуємо ML (але не обов'язково)
+    setStatus("Перевірка моделі…");
+    scaler = await tryLoadScaler();
+    model = await tryLoadModel();
+
+    if (scaler && model){
+      setStatus("ML прогноз на 24 години…");
+      await buildWithML(j);
+    }else{
+      setStatus("Прогноз з Open-Meteo (без ML)…");
+      await buildFromApiOnly(j);
+    }
+
+    setNow();
+    renderXLabels();
+    renderSpark();
+    renderDays();
+    setStatus("Готово ✅");
   }catch(e){
     console.error(e);
     setStatus("Помилка: " + (e?.message || e));
   }
-})();
+}
+
+main();
