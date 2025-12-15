@@ -4,7 +4,7 @@
   --text:#111827;
   --muted:#6b7280;
   --line:#e5e7eb;
-  --accent:#f4c10f;          /* жовта лінія як на скріні */
+  --accent:#f4c10f;
   --accent-soft: rgba(244,193,15,.18);
   --shadow: 0 18px 45px rgba(17,24,39,.08);
   --radius: 18px;
@@ -66,10 +66,7 @@ body{
 .big #tempNow{font-size:64px;}
 .big .deg{font-size:30px; margin-top:6px; color:var(--muted);}
 
-.unit-toggle{
-  display:flex;
-  gap:6px;
-}
+.unit-toggle{ display:flex; gap:6px; }
 .unit{
   border:1px solid var(--line);
   background:#fff;
@@ -108,7 +105,6 @@ body{
   line-height:1.3;
 }
 
-/* Tabs */
 .tabs{
   display:flex;
   gap:18px;
@@ -137,28 +133,15 @@ body{
   background: var(--accent);
 }
 
-/* Chart */
 .chart{
   position:relative;
   padding: 14px 0 8px;
 }
-#spark{
-  width:100%;
-  height:140px;
-  display:block;
-}
-#line{
-  fill:none;
-  stroke: var(--accent);
-  stroke-width:3;
-}
-#area{
-  fill: var(--accent-soft);
-  stroke:none;
-}
-.dot{
-  fill: var(--accent);
-}
+#spark{ width:100%; height:140px; display:block; }
+#line{ fill:none; stroke: var(--accent); stroke-width:3; }
+#area{ fill: var(--accent-soft); stroke:none; }
+.dot{ fill: var(--accent); }
+
 .yline{
   position:absolute;
   left:0; right:0;
@@ -177,7 +160,6 @@ body{
   margin-top: 6px;
 }
 
-/* Days row */
 .days{
   display:flex;
   justify-content:space-between;
