@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Погода</title>
 
-  <!-- CSS -->
+  <!-- ✅ ПІДКЛЮЧЕННЯ СТИЛІВ -->
   <link rel="stylesheet" href="web/css/style.css" />
 
-  <!-- TFJS (обязательно, иначе tf is not defined) -->
+  <!-- (не обов’язково для кнопок, але хай буде на майбутнє для моделі) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 </head>
 
@@ -25,8 +25,8 @@
             </div>
 
             <div class="unit-toggle" role="group" aria-label="Одиниці">
-              <button class="unit is-active" data-unit="C">°C</button>
-              <button class="unit" data-unit="F">°F</button>
+              <button class="unit is-active" data-unit="C" type="button">°C</button>
+              <button class="unit" data-unit="F" type="button">°F</button>
             </div>
 
             <div class="stats">
@@ -47,16 +47,16 @@
       </header>
 
       <nav class="tabs" aria-label="Графіки">
-        <button class="tab is-active" data-tab="temp">Температура</button>
-        <button class="tab" data-tab="precip">Ймовірність опадків</button>
-        <button class="tab" data-tab="wind">Вітер</button>
+        <button class="tab is-active" data-tab="temp" type="button">Температура</button>
+        <button class="tab" data-tab="precip" type="button">Ймовірність опадків</button>
+        <button class="tab" data-tab="wind" type="button">Вітер</button>
       </nav>
 
       <section class="chart">
         <div class="yline"></div>
-        <svg id="spark" viewBox="0 0 700 140" preserveAspectRatio="none">
-          <path id="area" d="" />
-          <path id="line" d="" />
+        <svg id="spark" viewBox="0 0 700 140" preserveAspectRatio="none" aria-label="Графік">
+          <path id="area" d=""></path>
+          <path id="line" d=""></path>
           <g id="dots"></g>
         </svg>
         <div class="xlabels" id="xlabels"></div>
@@ -64,12 +64,12 @@
 
       <section class="days" id="days"></section>
 
-      <!-- статус нужен для сообщений из JS -->
-      <footer class="foot"><span id="status">Завантаження…</span></footer>
+      <!-- ✅ щоб JS міг писати статус -->
+      <footer class="foot"><span id="status">Готово ✅</span></footer>
     </section>
   </main>
 
-  <!-- JS -->
+  <!-- ✅ ПІДКЛЮЧЕННЯ JS -->
   <script src="web/js/app.js"></script>
 </body>
 </html>
