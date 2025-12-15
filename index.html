@@ -4,8 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Погода</title>
-  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="web/css/style.css" />
 </head>
+
 <body>
   <main class="wrap">
     <section class="card">
@@ -48,12 +51,11 @@
 
       <section class="chart">
         <div class="yline"></div>
-        <svg id="spark" viewBox="0 0 700 140" preserveAspectRatio="none" aria-label="Графік">
+        <svg id="spark" viewBox="0 0 700 140" preserveAspectRatio="none">
           <path id="area" d="" />
           <path id="line" d="" />
           <g id="dots"></g>
         </svg>
-
         <div class="xlabels" id="xlabels"></div>
       </section>
 
@@ -61,8 +63,7 @@
     </section>
   </main>
 
-  <script src="js/app.js"></script>
+  <!-- JS -->
+  <script src="web/js/app.js"></script>
 </body>
 </html>
-<link rel="stylesheet" href="css/style.css">
-<script src="js/app.js"></script>
