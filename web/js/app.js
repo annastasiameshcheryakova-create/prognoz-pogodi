@@ -10,12 +10,17 @@ let scaler = null;
 
 let data = {
   now: { c: 0, precip: 0, humidity: 0, windKmh: 0, summary: CITY, dayName: "—" },
-  hours: [],  // 24 forecast points (temp model output + real precip/wind optionally)
+  hours: [],
   days: []
 };
 
 const $ = (s) => document.querySelector(s);
 const cToF = (c) => Math.round((c * 9/5) + 32);
+
+function setStatus(msg){
+  const el = $("#status");
+  if (el) el.textContent = msg; // не ломаем сайт, если элемента нет
+}
 
 function setActiveButtons(){
   document.querySelectorAll(".unit").forEach(b =>
@@ -136,24 +141,19 @@ function formatHHMM(iso){
   return t.slice(0,5);
 }
 function findClosestHourIndex(hourlyTimes, currentTimeISO){
-  const key = currentTimeISO.slice(0, 13); // YYYY-MM-DDTHH
+  const key = currentTimeISO.slice(0, 13);
   const i = hourlyTimes.findIndex(t => t.startsWith(key));
   return i !== -1 ? i : 0;
 }
 
+/** ВАЖНО: на Pages scaler лежит тут */
 async function loadScaler(){
-  const r = await fetch("../artifacts/scaler.json").catch(()=>null);
-  // якщо artifacts недоступний на GitHub Pages — поклади scaler.json у web/ також
-  if (!r || !r.ok) {
-    const r2 = await fetch("scaler.json");
-    if (!r2.ok) throw new Error("Нема scaler.json (поклади його у web/ або web/model/)");
-    return await r2.json();
-  }
+  const r = await fetch("web/scaler.json");
+  if (!r.ok) throw new Error("Не знайдено web/scaler.json");
   return await r.json();
 }
 
 function scaleRow(row){
-  // row: [temp_c, humidity, wind_kmh, precip_prob]
   const out = [];
   for (let i=0;i<row.length;i++){
     out.push((row[i] - scaler.mean[i]) / scaler.scale[i]);
@@ -162,7 +162,6 @@ function scaleRow(row){
 }
 
 async function fetchHistoryAndReal24h(){
-  // беремо 72 години, щоб точно мати останні 48 для входу + 24 для підписів
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
     `&hourly=temperature_2m,precipitation_probability,windspeed_10m,relativehumidity_2m` +
@@ -176,8 +175,8 @@ async function fetchHistoryAndReal24h(){
   const times = j.hourly.time;
   const idxNow = findClosestHourIndex(times, j.current_weather.time);
 
-  const inputHours = scaler.input_hours;   // 48
-  const horizon = scaler.horizon;          // 24
+  const inputHours = scaler.input_hours; // 48
+  const horizon = scaler.horizon;        // 24
 
   const startIn = Math.max(0, idxNow - (inputHours - 1));
   const endIn = startIn + inputHours;
@@ -195,7 +194,6 @@ async function fetchHistoryAndReal24h(){
     return scaleRow(row);
   });
 
-  // “реальні” метрики для now (з API)
   data.now = {
     c: Math.round(j.current_weather.temperature),
     precip: Math.round(j.hourly.precipitation_probability[idxNow] ?? 0),
@@ -205,7 +203,6 @@ async function fetchHistoryAndReal24h(){
     dayName: dayNameUA(new Date())
   };
 
-  // 8-day row (просто красиво)
   data.days = (j.daily.time || []).slice(0, 8).map((d, k) => ({
     name: shortDowUA(d),
     icon: "☁️",
@@ -214,7 +211,6 @@ async function fetchHistoryAndReal24h(){
     today: k === 0
   }));
 
-  // також підготуємо “реальні” precip/wind на 24 години для вкладок
   const start24 = idxNow;
   const end24 = Math.min(times.length, start24 + horizon);
   const labels24 = times.slice(start24, end24).map(formatHHMM);
@@ -232,19 +228,20 @@ async function fetchHistoryAndReal24h(){
 }
 
 async function predict24h(){
-  $("#status").textContent = "Завантаження scaler…";
+  setStatus("Завантаження scaler…");
   scaler = await loadScaler();
 
-  $("#status").textContent = "Завантаження TF.js моделі…";
-  model = await tf.loadLayersModel("model/model.json");
+  setStatus("Завантаження TF.js моделі…");
+  // ВАЖНО: модель лежит в web/model/
+  model = await tf.loadLayersModel("web/model/model.json");
 
-  $("#status").textContent = "Отримання даних (Кривий Ріг)…";
+  setStatus("Отримання даних (Кривий Ріг)…");
   const { Xwin, labels24, real24 } = await fetchHistoryAndReal24h();
 
-  $("#status").textContent = "Прогноз на 24 години…";
+  setStatus("Прогноз на 24 години…");
   const x = tf.tensor(Xwin, [1, scaler.input_hours, scaler.features.length], "float32");
   const y = model.predict(x);
-  const yArr = Array.from(await y.data()); // 24 значення температури (°C як в train)
+  const yArr = Array.from(await y.data());
 
   x.dispose(); y.dispose();
 
@@ -255,7 +252,7 @@ async function predict24h(){
     wind: real24[i]?.wind ?? 0,
   }));
 
-  $("#status").textContent = "Готово ✅";
+  setStatus("Готово ✅");
   setNow();
   renderXLabels();
   renderSpark();
@@ -270,7 +267,7 @@ async function predict24h(){
     await predict24h();
   }catch(e){
     console.error(e);
-    $("#status").textContent = "Помилка: " + (e?.message || e);
+    setStatus("Помилка: " + (e?.message || e));
   }
 })();
 
