@@ -1,0 +1,18 @@
+# --- Core ML ---
+tensorflow==2.15.0
+numpy>=1.24,<2.0
+pandas>=2.0,<3.0
+scikit-learn>=1.3,<2.0
+
+# --- Візуалізація / EDA (для notebooks/01_data_exploration.ipynb) ---
+matplotlib>=3.7,<4.0
+
+# --- Jupyter notebooks ---
+jupyter>=1.0,<2.0
+ipykernel>=6.0,<7.0
+
+# --- Конвертація у TensorFlow.js (дає команду tensorflowjs_converter) ---
+tensorflowjs==4.22.0
+
+# --- Допоміжне (опційно, але корисно) ---
+tqdm>=4.66,<5.0
