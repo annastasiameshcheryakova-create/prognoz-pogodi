@@ -53,12 +53,21 @@
       </nav>
 
       <section class="chart">
+        <!-- ✅ РОЗМІТКА ШКАЛИ (min / mid / max) -->
+        <div class="ylabels" id="ylabels"></div>
+
         <div class="yline"></div>
+
         <svg id="spark" viewBox="0 0 700 140" preserveAspectRatio="none" aria-label="Графік">
           <path id="area" d=""></path>
           <path id="line" d=""></path>
+
           <g id="dots"></g>
+
+          <!-- ✅ РОЗМІТКА ПІДПИСІВ ЗНАЧЕНЬ НА ТОЧКАХ -->
+          <g id="vals"></g>
         </svg>
+
         <div class="xlabels" id="xlabels"></div>
       </section>
 
