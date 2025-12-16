@@ -1,204 +1,359 @@
-:root{
-  --bg:#f4f6fb;
-  --card:#ffffff;
-  --text:#111827;
-  --muted:#6b7280;
-  --line:#e5e7eb;
-  --accent:#f4c10f;
-  --accent-soft: rgba(244,193,15,.18);
-  --shadow: 0 18px 45px rgba(17,24,39,.08);
-  --radius: 18px;
+const CITY = "Кривий Ріг";
+const LAT = 47.9105;
+const LON = 33.3918;
+
+let unit = "C";
+let tab = "temp";
+
+let model = null;
+let scaler = null;
+
+let data = {
+  now: { c: 0, precip: 0, humidity: 0, windKmh: 0, summary: CITY, dayName: "—" },
+  hours: [],   // [{t, c, precip, wind}]
+  days: []
+};
+
+const $ = (s) => document.querySelector(s);
+const cToF = (c) => Math.round((c * 9/5) + 32);
+
+function setStatus(msg){
+  const el = $("#status");
+  if (el) el.textContent = msg;
 }
 
-*{box-sizing:border-box}
-body{
-  margin:0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  background: var(--bg);
-  color: var(--text);
+function setActiveButtons(){
+  document.querySelectorAll(".unit").forEach(b =>
+    b.classList.toggle("is-active", b.dataset.unit === unit)
+  );
+  document.querySelectorAll(".tab").forEach(b =>
+    b.classList.toggle("is-active", b.dataset.tab === tab)
+  );
 }
 
-.wrap{
-  min-height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:24px;
+function setNow(){
+  const t = unit === "C" ? data.now.c : cToF(data.now.c);
+  $("#tempNow").textContent = t;
+  $("#precipNow").textContent = `${data.now.precip}%`;
+  $("#humidityNow").textContent = `${data.now.humidity}%`;
+  $("#windNow").textContent = `${data.now.windKmh} км/ч`;
+  $("#summary").textContent = data.now.summary;
+  $("#dayName").textContent = data.now.dayName;
 }
 
-.card{
-  width:min(980px, 100%);
-  background: var(--card);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 22px 22px 16px;
+function renderDays(){
+  const host = $("#days");
+  host.innerHTML = "";
+  data.days.forEach(d=>{
+    const el = document.createElement("div");
+    el.className = `day ${d.today ? "is-today":""}`;
+    el.innerHTML = `
+      <div class="dname">${d.name}</div>
+      <div class="dicon">${d.icon}</div>
+      <div class="dtemp">${d.hi}° ${d.lo}°</div>
+    `;
+    host.appendChild(el);
+  });
 }
 
-.top{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:16px;
+/* ✅ тепер показуємо всі 24 години */
+function renderXLabels(){
+  const host = $("#xlabels");
+  host.innerHTML = "";
+  data.hours.forEach(h=>{
+    const s = document.createElement("div");
+    s.textContent = h.t;
+    host.appendChild(s);
+  });
 }
 
-.now{
-  display:flex;
-  gap:14px;
-  align-items:flex-start;
+function seriesMeta(){
+  if (tab === "temp"){
+    return {
+      suffix: unit === "C" ? "°C" : "°F",
+      values: data.hours.map(h => unit === "C" ? h.c : cToF(h.c))
+    };
+  }
+  if (tab === "precip"){
+    return { suffix: "%", values: data.hours.map(h => h.precip) };
+  }
+  return { suffix: " км/ч", values: data.hours.map(h => h.wind) };
 }
 
-.icon{
-  width:56px;height:56px;
-  display:grid;place-items:center;
-  font-size:34px;
-  border-radius:14px;
-  background:#f3f4f6;
+function renderYLabels(){
+  const host = $("#ylabels");
+  if (!host) return;
+
+  const { values, suffix } = seriesMeta();
+  if (!values.length) { host.innerHTML = ""; return; }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const mid = Math.round((min + max) / 2);
+
+  host.innerHTML = `
+    <div class="yl">${max}${suffix}</div>
+    <div class="yl">${mid}${suffix}</div>
+    <div class="yl">${min}${suffix}</div>
+  `;
 }
 
-.temp{display:flex; flex-direction:column; gap:10px;}
-.big{
-  display:flex;
-  align-items:flex-start;
-  gap:2px;
-  line-height:1;
-  font-weight:600;
-}
-.big #tempNow{font-size:64px;}
-.big .deg{font-size:30px; margin-top:6px; color:var(--muted);}
+function renderSpark(){
+  const svgW = 700, svgH = 140, padX = 18, padY = 18;
 
-.unit-toggle{ display:flex; gap:6px; }
-.unit{
-  border:1px solid var(--line);
-  background:#fff;
-  padding:6px 10px;
-  border-radius:10px;
-  cursor:pointer;
-  font-weight:600;
-  color:var(--muted);
-}
-.unit.is-active{
-  border-color: transparent;
-  background:#111827;
-  color:#fff;
-}
+  const { values, suffix } = seriesMeta();
+  if (!values.length) return;
 
-.stats{
-  font-size:13px;
-  color:var(--muted);
-  display:flex;
-  flex-direction:column;
-  gap:3px;
-}
-.stats .label{color:#374151}
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = (max - min) || 1;
 
-.place{
-  text-align:right;
-  padding-top:4px;
-}
-.place .title{
-  font-weight:700;
-  font-size:22px;
-}
-.place .sub{
-  margin-top:4px;
-  color:var(--muted);
-  line-height:1.3;
-}
+  const n = values.length;
+  const xStep = (svgW - padX*2) / (n - 1);
 
-.tabs{
-  display:flex;
-  gap:18px;
-  margin-top:16px;
-  border-bottom:1px solid var(--line);
-  padding-bottom:10px;
-}
-.tab{
-  border:0;
-  background:transparent;
-  padding:8px 0;
-  cursor:pointer;
-  color:var(--muted);
-  font-weight:700;
-}
-.tab.is-active{
-  color:var(--text);
-  position:relative;
-}
-.tab.is-active::after{
-  content:"";
-  position:absolute;
-  left:0; right:0; bottom:-11px;
-  height:3px;
-  border-radius:999px;
-  background: var(--accent);
+  const pts = values.map((v, i) => {
+    const x = padX + i * xStep;
+    const y = padY + (svgH - padY*2) * (1 - (v - min)/span);
+    return {x, y, v};
+  });
+
+  const dLine = pts.map((p,i)=> `${i===0?"M":"L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  $("#line").setAttribute("d", dLine);
+
+  const dArea = `${dLine} L ${(padX + (n-1)*xStep).toFixed(2)} ${(svgH-padY).toFixed(2)} L ${padX.toFixed(2)} ${(svgH-padY).toFixed(2)} Z`;
+  $("#area").setAttribute("d", dArea);
+
+  // dots
+  const dots = $("#dots");
+  dots.innerHTML = "";
+  pts.forEach(p=>{
+    const c = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    c.setAttribute("class","dot");
+    c.setAttribute("cx", p.x);
+    c.setAttribute("cy", p.y);
+    c.setAttribute("r", 3.5);
+    dots.appendChild(c);
+  });
+
+  // ✅ value labels on points (кожні 3 години + остання)
+  const vals = $("#vals");
+  vals.innerHTML = "";
+  pts.forEach((p, i)=>{
+    const show = (i % 3 === 0) || (i === pts.length - 1);
+    if (!show) return;
+
+    const t = document.createElementNS("http://www.w3.org/2000/svg","text");
+    t.setAttribute("class","val");
+    t.setAttribute("x", p.x);
+    t.setAttribute("y", Math.max(12, p.y - 10));
+    t.setAttribute("text-anchor","middle");
+    t.textContent = `${p.v}${suffix}`;
+    vals.appendChild(t);
+  });
+
+  renderYLabels();
 }
 
-.chart{
-  position:relative;
-  padding: 14px 0 8px;
-}
-#spark{ width:100%; height:140px; display:block; }
-#line{ fill:none; stroke: var(--accent); stroke-width:3; }
-#area{ fill: var(--accent-soft); stroke:none; }
-.dot{ fill: var(--accent); }
+function wire(){
+  document.querySelectorAll(".unit").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      unit = b.dataset.unit;
+      setActiveButtons();
+      setNow();
+      renderSpark(); // перерахунок підписів °C/°F
+    });
+  });
 
-.yline{
-  position:absolute;
-  left:0; right:0;
-  top:50%;
-  height:1px;
-  background: linear-gradient(to right, transparent, var(--line), transparent);
-  pointer-events:none;
-}
-
-.xlabels{
-  display:flex;
-  justify-content:space-between;
-  color:var(--muted);
-  font-size:12px;
-  padding: 0 2px;
-  margin-top: 6px;
+  document.querySelectorAll(".tab").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      tab = b.dataset.tab;
+      setActiveButtons();
+      renderSpark(); // перерахунок серії + шкали
+    });
+  });
 }
 
-.days{
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-  padding-top: 10px;
-  border-top:1px solid var(--line);
-  margin-top: 8px;
+function dayNameUA(d){
+  const names = ["неділя","понеділок","вівторок","середа","четвер","пʼятниця","субота"];
+  return names[d.getDay()];
+}
+function shortDowUA(isoDate){
+  const d = new Date(isoDate);
+  const names = ["НД","ПН","ВТ","СР","ЧТ","ПТ","СБ"];
+  return names[d.getDay()];
+}
+function formatHHMM(iso){
+  const t = iso.split("T")[1] || "";
+  return t.slice(0,5);
+}
+function findClosestHourIndex(hourlyTimes, currentTimeISO){
+  const key = currentTimeISO.slice(0, 13);
+  const i = hourlyTimes.findIndex(t => t.startsWith(key));
+  return i !== -1 ? i : 0;
 }
 
-.day{
-  flex:1;
-  min-width: 0;
-  text-align:center;
-  padding:10px 8px;
-  border-radius:14px;
-  background:#fff;
+async function tryLoadScaler(){
+  const r = await fetch("web/scaler.json").catch(()=>null);
+  if (!r || !r.ok) return null;
+  return await r.json();
 }
-.day .dname{
-  color:var(--muted);
-  font-weight:700;
-  font-size:12px;
-  margin-bottom:8px;
-}
-.day .dicon{
-  font-size:22px;
-  margin-bottom:8px;
-}
-.day .dtemp{
-  font-weight:700;
-  font-size:13px;
-}
-.day.is-today{
-  background:#f9fafb;
-  outline:1px solid var(--line);
+async function tryLoadModel(){
+  if (typeof tf === "undefined") return null;
+  try{
+    return await tf.loadLayersModel("web/model/model.json");
+  }catch{
+    return null;
+  }
 }
 
-@media (max-width:720px){
-  .top{flex-direction:column; align-items:stretch;}
-  .place{text-align:left}
-  .days{overflow:auto}
-  .day{min-width:120px}
+function scaleRow(row){
+  const out = [];
+  for (let i=0;i<row.length;i++){
+    out.push((row[i] - scaler.mean[i]) / scaler.scale[i]);
+  }
+  return out;
 }
+
+async function fetchOpenMeteo(){
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
+    `&hourly=temperature_2m,precipitation_probability,windspeed_10m,relativehumidity_2m` +
+    `&daily=temperature_2m_max,temperature_2m_min` +
+    `&current_weather=true&timezone=Europe%2FKyiv`;
+
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Не вдалося завантажити дані погоди");
+  return await r.json();
+}
+
+async function buildFromApiOnly(j){
+  const times = j.hourly.time;
+  const idxNow = findClosestHourIndex(times, j.current_weather.time);
+
+  data.now = {
+    c: Math.round(j.current_weather.temperature),
+    precip: Math.round(j.hourly.precipitation_probability[idxNow] ?? 0),
+    humidity: Math.round(j.hourly.relativehumidity_2m[idxNow] ?? 0),
+    windKmh: Math.round(j.current_weather.windspeed),
+    summary: CITY,
+    dayName: dayNameUA(new Date())
+  };
+
+  data.days = (j.daily.time || []).slice(0, 8).map((d, k) => ({
+    name: shortDowUA(d),
+    icon: "☁️",
+    hi: Math.round(j.daily.temperature_2m_max[k]),
+    lo: Math.round(j.daily.temperature_2m_min[k]),
+    today: k === 0
+  }));
+
+  const start24 = idxNow;
+  const end24 = Math.min(times.length, start24 + 24);
+
+  data.hours = [];
+  for (let i=start24;i<end24;i++){
+    data.hours.push({
+      t: formatHHMM(times[i]),
+      c: Math.round(j.hourly.temperature_2m[i] ?? 0),
+      precip: Math.round(j.hourly.precipitation_probability[i] ?? 0),
+      wind: Math.round(j.hourly.windspeed_10m[i] ?? 0),
+    });
+  }
+}
+
+async function buildWithML(j){
+  const times = j.hourly.time;
+  const idxNow = findClosestHourIndex(times, j.current_weather.time);
+
+  const inputHours = scaler.input_hours;
+  const horizon = scaler.horizon;
+
+  const startIn = Math.max(0, idxNow - (inputHours - 1));
+  const endIn = startIn + inputHours;
+
+  const Xwin = [];
+  for (let k=0;k<inputHours;k++){
+    const i = startIn + k;
+    const row = [
+      j.hourly.temperature_2m[i],
+      j.hourly.relativehumidity_2m[i] ?? 0,
+      j.hourly.windspeed_10m[i] ?? 0,
+      j.hourly.precipitation_probability[i] ?? 0
+    ];
+    Xwin.push(scaleRow(row));
+  }
+
+  data.now = {
+    c: Math.round(j.current_weather.temperature),
+    precip: Math.round(j.hourly.precipitation_probability[idxNow] ?? 0),
+    humidity: Math.round(j.hourly.relativehumidity_2m[idxNow] ?? 0),
+    windKmh: Math.round(j.current_weather.windspeed),
+    summary: CITY,
+    dayName: dayNameUA(new Date())
+  };
+
+  data.days = (j.daily.time || []).slice(0, 8).map((d, k) => ({
+    name: shortDowUA(d),
+    icon: "☁️",
+    hi: Math.round(j.daily.temperature_2m_max[k]),
+    lo: Math.round(j.daily.temperature_2m_min[k]),
+    today: k === 0
+  }));
+
+  const start24 = idxNow;
+  const end24 = Math.min(times.length, start24 + horizon);
+
+  const labels24 = times.slice(start24, end24).map(formatHHMM);
+  const real24 = [];
+  for (let i=start24;i<end24;i++){
+    real24.push({
+      precip: Math.round(j.hourly.precipitation_probability[i] ?? 0),
+      wind: Math.round(j.hourly.windspeed_10m[i] ?? 0),
+    });
+  }
+
+  const x = tf.tensor(Xwin, [1, inputHours, scaler.features.length], "float32");
+  const y = model.predict(x);
+  const yArr = Array.from(await y.data());
+  x.dispose(); y.dispose();
+
+  data.hours = yArr.map((temp, i) => ({
+    t: labels24[i] ?? `${i}:00`,
+    c: Math.round(temp),
+    precip: real24[i]?.precip ?? 0,
+    wind: real24[i]?.wind ?? 0,
+  }));
+}
+
+async function main(){
+  wire();
+  setActiveButtons();
+  setStatus("Завантаження даних…");
+
+  try{
+    const j = await fetchOpenMeteo();
+
+    setStatus("Перевірка моделі…");
+    scaler = await tryLoadScaler();
+    model = await tryLoadModel();
+
+    if (scaler && model){
+      setStatus("ML прогноз на 24 години…");
+      await buildWithML(j);
+    }else{
+      setStatus("Прогноз з Open-Meteo (без ML)…");
+      await buildFromApiOnly(j);
+    }
+
+    setNow();
+    renderXLabels();
+    renderSpark();
+    renderDays();
+    setStatus("Готово ✅");
+  }catch(e){
+    console.error(e);
+    setStatus("Помилка: " + (e?.message || e));
+  }
+}
+
+main();
