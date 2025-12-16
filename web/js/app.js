@@ -74,11 +74,11 @@ function seriesByTab(){
   return data.hours.map(h => h.wind);
 }
 
-/* ✅ ДОДАНО: підписи осі Y (красиві цифри) */
+/* ✅ Підпис осі Y */
 function seriesSuffix(){
   if (tab === "temp") return "°";
   if (tab === "precip") return "%";
-  return ""; // для вітру можна лишити без суфікса (або "км/ч")
+  return "";
 }
 
 function niceStep(span){
@@ -91,6 +91,7 @@ function niceStep(span){
   return m * pow;
 }
 
+/* ✅ ВИПРАВЛЕНО: без повторів 4°,4° */
 function renderYAxis(){
   const host = document.getElementById("yaxis");
   if (!host) return;
@@ -106,28 +107,30 @@ function renderYAxis(){
   const minTick = Math.floor(minV / step) * step;
   const maxTick = Math.ceil(maxV / step) * step;
 
-  // хочемо 5-6 ліній
-  const ticks = [];
-  for (let v = minTick; v <= maxTick + 1e-9; v += step) ticks.push(v);
-
-  // якщо їх забагато — рідше
-  while (ticks.length > 6) {
-    for (let i = 1; i < ticks.length; i += 2) ticks.splice(i, 1);
+  let ticks = [];
+  for (let v = minTick; v <= maxTick + 1e-9; v += step) {
+    ticks.push(Math.round(v)); // одразу округляємо
   }
-  // якщо замало — додамо середні (дуже рідко потрібно)
-  if (ticks.length < 4) {
-    const mid = (minTick + maxTick) / 2;
-    ticks.splice(1, 0, mid);
+
+  // ✅ прибираємо дублікати
+  ticks = [...new Set(ticks)];
+
+  // ✅ якщо забагато — рідше
+  if (ticks.length > 6) ticks = ticks.filter((_, i) => i % 2 === 0);
+
+  // ✅ якщо замало — додаємо середнє (дуже рідко)
+  if (ticks.length < 4 && ticks.length >= 2){
+    const mid = Math.round((ticks[0] + ticks[ticks.length - 1]) / 2);
+    if (!ticks.includes(mid)) ticks.splice(1, 0, mid);
   }
 
   const suf = seriesSuffix();
   host.innerHTML = "";
 
-  // зверху вниз
   ticks.slice().reverse().forEach(v=>{
     const el = document.createElement("div");
     el.className = "yval";
-    el.textContent = `${Math.round(v)}${suf}`;
+    el.textContent = `${v}${suf}`;
     host.appendChild(el);
   });
 }
@@ -167,8 +170,7 @@ function renderSpark(){
     dots.appendChild(c);
   });
 
-  // ✅ важливо: оновлюємо шкалу після побудови графіка
-  renderYAxis();
+  renderYAxis(); // ✅
 }
 
 function wire(){
@@ -177,7 +179,7 @@ function wire(){
       unit = b.dataset.unit;
       setActiveButtons();
       setNow();
-      renderSpark();     // ✅ перерахунок графіка + шкали
+      renderSpark();
     });
   });
 
@@ -185,7 +187,7 @@ function wire(){
     b.addEventListener("click", ()=>{
       tab = b.dataset.tab;
       setActiveButtons();
-      renderSpark();     // ✅ перерахунок шкали для опадів/вітру
+      renderSpark();
     });
   });
 }
@@ -204,7 +206,7 @@ function formatHHMM(iso){
   return t.slice(0,5);
 }
 function findClosestHourIndex(hourlyTimes, currentTimeISO){
-  const key = currentTimeISO.slice(0, 13); // YYYY-MM-DDTHH
+  const key = currentTimeISO.slice(0, 13);
   const i = hourlyTimes.findIndex(t => t.startsWith(key));
   return i !== -1 ? i : 0;
 }
