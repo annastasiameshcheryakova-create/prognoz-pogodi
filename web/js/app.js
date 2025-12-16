@@ -74,6 +74,64 @@ function seriesByTab(){
   return data.hours.map(h => h.wind);
 }
 
+/* ✅ ДОДАНО: підписи осі Y (красиві цифри) */
+function seriesSuffix(){
+  if (tab === "temp") return "°";
+  if (tab === "precip") return "%";
+  return ""; // для вітру можна лишити без суфікса (або "км/ч")
+}
+
+function niceStep(span){
+  // робимо “красивий” крок (1,2,5,10...)
+  if (span <= 0) return 1;
+  const rough = span / 4; // 5 значень
+  const pow = Math.pow(10, Math.floor(Math.log10(rough)));
+  const n = rough / pow;
+  const m = n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10;
+  return m * pow;
+}
+
+function renderYAxis(){
+  const host = document.getElementById("yaxis");
+  if (!host) return;
+
+  const values = seriesByTab();
+  if (!values.length) { host.innerHTML = ""; return; }
+
+  const minV = Math.min(...values);
+  const maxV = Math.max(...values);
+  const span = (maxV - minV) || 1;
+
+  const step = niceStep(span);
+  const minTick = Math.floor(minV / step) * step;
+  const maxTick = Math.ceil(maxV / step) * step;
+
+  // хочемо 5-6 ліній
+  const ticks = [];
+  for (let v = minTick; v <= maxTick + 1e-9; v += step) ticks.push(v);
+
+  // якщо їх забагато — рідше
+  while (ticks.length > 6) {
+    for (let i = 1; i < ticks.length; i += 2) ticks.splice(i, 1);
+  }
+  // якщо замало — додамо середні (дуже рідко потрібно)
+  if (ticks.length < 4) {
+    const mid = (minTick + maxTick) / 2;
+    ticks.splice(1, 0, mid);
+  }
+
+  const suf = seriesSuffix();
+  host.innerHTML = "";
+
+  // зверху вниз
+  ticks.slice().reverse().forEach(v=>{
+    const el = document.createElement("div");
+    el.className = "yval";
+    el.textContent = `${Math.round(v)}${suf}`;
+    host.appendChild(el);
+  });
+}
+
 function renderSpark(){
   const svgW = 700, svgH = 140, padX = 18, padY = 18;
   const values = seriesByTab();
@@ -108,6 +166,9 @@ function renderSpark(){
     c.setAttribute("r", 3.5);
     dots.appendChild(c);
   });
+
+  // ✅ важливо: оновлюємо шкалу після побудови графіка
+  renderYAxis();
 }
 
 function wire(){
@@ -116,7 +177,7 @@ function wire(){
       unit = b.dataset.unit;
       setActiveButtons();
       setNow();
-      renderSpark();
+      renderSpark();     // ✅ перерахунок графіка + шкали
     });
   });
 
@@ -124,7 +185,7 @@ function wire(){
     b.addEventListener("click", ()=>{
       tab = b.dataset.tab;
       setActiveButtons();
-      renderSpark();
+      renderSpark();     // ✅ перерахунок шкали для опадів/вітру
     });
   });
 }
@@ -155,7 +216,6 @@ async function tryLoadScaler(){
   return await r.json();
 }
 async function tryLoadModel(){
-  // Якщо tfjs не підключено — не падаємо
   if (typeof tf === "undefined") return null;
   try{
     return await tf.loadLayersModel("web/model/model.json");
@@ -188,7 +248,6 @@ async function buildFromApiOnly(j){
   const times = j.hourly.time;
   const idxNow = findClosestHourIndex(times, j.current_weather.time);
 
-  // now
   data.now = {
     c: Math.round(j.current_weather.temperature),
     precip: Math.round(j.hourly.precipitation_probability[idxNow] ?? 0),
@@ -198,7 +257,6 @@ async function buildFromApiOnly(j){
     dayName: dayNameUA(new Date())
   };
 
-  // days
   data.days = (j.daily.time || []).slice(0, 8).map((d, k) => ({
     name: shortDowUA(d),
     icon: "☁️",
@@ -207,7 +265,6 @@ async function buildFromApiOnly(j){
     today: k === 0
   }));
 
-  // 24h прям з API (без ML)
   const horizon = 24;
   const start24 = idxNow;
   const end24 = Math.min(times.length, start24 + horizon);
@@ -245,7 +302,6 @@ async function buildWithML(j){
     Xwin.push(scaleRow(row));
   }
 
-  // now + days так само з API
   data.now = {
     c: Math.round(j.current_weather.temperature),
     precip: Math.round(j.hourly.precipitation_probability[idxNow] ?? 0),
@@ -263,7 +319,6 @@ async function buildWithML(j){
     today: k === 0
   }));
 
-  // реальні precip/wind + labels на 24h
   const start24 = idxNow;
   const end24 = Math.min(times.length, start24 + horizon);
 
@@ -276,7 +331,6 @@ async function buildWithML(j){
     });
   }
 
-  // predict
   const x = tf.tensor(Xwin, [1, inputHours, scaler.features.length], "float32");
   const y = model.predict(x);
   const yArr = Array.from(await y.data());
@@ -298,7 +352,6 @@ async function main(){
   try{
     const j = await fetchOpenMeteo();
 
-    // пробуємо ML (але не обов'язково)
     setStatus("Перевірка моделі…");
     scaler = await tryLoadScaler();
     model = await tryLoadModel();
