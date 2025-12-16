@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Погода</title>
 
-  <!-- ✅ ПІДКЛЮЧЕННЯ СТИЛІВ -->
+  <!-- ✅ STYLE -->
   <link rel="stylesheet" href="web/css/style.css" />
 
-  <!-- (не обов’язково для кнопок, але хай буде на майбутнє для моделі) -->
+  <!-- ✅ TFJS (не заважає, стане в пригоді для моделі) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 </head>
 
@@ -53,19 +53,14 @@
       </nav>
 
       <section class="chart">
-        <!-- ✅ РОЗМІТКА ШКАЛИ (min / mid / max) -->
-        <div class="ylabels" id="ylabels"></div>
+        <!-- ✅ ШКАЛА З ЦИФРАМИ ЗЛІВА -->
+        <div class="yaxis" id="yaxis" aria-hidden="true"></div>
 
         <div class="yline"></div>
-
         <svg id="spark" viewBox="0 0 700 140" preserveAspectRatio="none" aria-label="Графік">
           <path id="area" d=""></path>
           <path id="line" d=""></path>
-
           <g id="dots"></g>
-
-          <!-- ✅ РОЗМІТКА ПІДПИСІВ ЗНАЧЕНЬ НА ТОЧКАХ -->
-          <g id="vals"></g>
         </svg>
 
         <div class="xlabels" id="xlabels"></div>
@@ -73,12 +68,11 @@
 
       <section class="days" id="days"></section>
 
-      <!-- ✅ щоб JS міг писати статус -->
       <footer class="foot"><span id="status">Готово ✅</span></footer>
     </section>
   </main>
 
-  <!-- ✅ ПІДКЛЮЧЕННЯ JS -->
+  <!-- ✅ JS -->
   <script src="web/js/app.js"></script>
 </body>
 </html>
