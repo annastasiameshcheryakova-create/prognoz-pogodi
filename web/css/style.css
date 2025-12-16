@@ -202,3 +202,44 @@ body{
   .days{overflow:auto}
   .day{min-width:120px}
 }
+/* ✅ ШКАЛА З ЦИФРАМИ ЗЛІВА (красиво) */
+.chart{ position:relative; }
+
+.yaxis{
+  position:absolute;
+  left:0;
+  top:16px;
+  bottom:34px;          /* щоб не налізло на xlabels */
+  width:44px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  pointer-events:none;
+  color:var(--muted);
+  font-size:12px;
+}
+
+.yaxis .yval{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  line-height:1;
+}
+
+.yaxis .yval::after{
+  content:"";
+  flex:1;
+  height:1px;
+  background:var(--line);
+  opacity:.55;
+}
+
+/* трохи відсунемо графік вправо, щоб шкала не накладалась */
+#spark{
+  margin-left: 44px;
+  width: calc(100% - 44px);
+}
+.xlabels{
+  margin-left: 44px;
+  width: calc(100% - 44px);
+}
