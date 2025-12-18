@@ -1,0 +1,94 @@
+"""
+pogodakryviyrig.py
+Збір реальних погодних даних для м. Кривий Ріг у CSV для навчання моделі.
+
+Джерела/референси:
+- Open-Meteo (API): https://open-meteo.com/
+- Google Weather (перевірка вручну): https://www.google.com/search?q=погода+Кривий+Ріг
+"""
+
+from __future__ import annotations
+import argparse
+import pandas as pd
+import requests
+
+CITY = "Кривий Ріг"
+LAT = 47.9105
+LON = 33.3918
+
+HOURLY_VARS = [
+    "temperature_2m",
+    "relativehumidity_2m",
+    "windspeed_10m",
+    "precipitation_probability",
+]
+
+def build_open_meteo_url(start_date: str, end_date: str, timezone: str = "Europe/Kyiv") -> str:
+    # Архівний endpoint Open-Meteo для історичних погодинних даних
+    # Документація: https://open-meteo.com/en/docs/historical-weather-api
+    return (
+        "https://archive-api.open-meteo.com/v1/archive"
+        f"?latitude={LAT}&longitude={LON}"
+        f"&start_date={start_date}&end_date={end_date}"
+        f"&hourly={','.join(HOURLY_VARS)}"
+        f"&timezone={timezone.replace('/', '%2F')}"
+    )
+
+def fetch_hourly(start_date: str, end_date: str) -> pd.DataFrame:
+    url = build_open_meteo_url(start_date, end_date)
+    r = requests.get(url, timeout=60)
+    r.raise_for_status()
+    j = r.json()
+
+    hourly = j.get("hourly", {})
+    df = pd.DataFrame({
+        "time": hourly.get("time", []),
+        "temperature_2m": hourly.get("temperature_2m", []),
+        "relativehumidity_2m": hourly.get("relativehumidity_2m", []),
+        "windspeed_10m": hourly.get("windspeed_10m", []),
+        "precipitation_probability": hourly.get("precipitation_probability", []),
+    })
+
+    # базова чистка
+    df["time"] = pd.to_datetime(df["time"])
+    df = df.sort_values("time").drop_duplicates(subset=["time"]).reset_index(drop=True)
+
+    # заповнення пропусків
+    df = df.interpolate(limit_direction="both")
+    df = df.fillna(method="bfill").fillna(method="ffill")
+
+    return df
+
+def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["hour"] = df["time"].dt.hour
+    df["dow"] = df["time"].dt.dayofweek
+
+    # циклічні фічі (корисно для якості)
+    import numpy as np
+    df["hour_sin"] = np.sin(2*np.pi*df["hour"]/24)
+    df["hour_cos"] = np.cos(2*np.pi*df["hour"]/24)
+    df["dow_sin"]  = np.sin(2*np.pi*df["dow"]/7)
+    df["dow_cos"]  = np.cos(2*np.pi*df["dow"]/7)
+    return df
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--start", required=True, help="YYYY-MM-DD")
+    p.add_argument("--end", required=True, help="YYYY-MM-DD")
+    p.add_argument("--out", default="data/weather_kriviyrih.csv", help="output csv path")
+    p.add_argument("--with_time_features", action="store_true", help="add hour/dow sin/cos columns")
+    args = p.parse_args()
+
+    df = fetch_hourly(args.start, args.end)
+
+    if args.with_time_features:
+        df = add_time_features(df)
+
+    # ISO формат, зручний для веба/ноутбуків
+    df["time"] = df["time"].dt.strftime("%Y-%m-%dT%H:%M")
+    df.to_csv(args.out, index=False, encoding="utf-8")
+    print(f"Saved {len(df)} rows to {args.out}")
+
+if __name__ == "__main__":
+    main()
